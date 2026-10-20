@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Picking de Islas - Hipermercado</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .highlight-card {
+            animation: pulse-border 1.5s infinite alternate;
+        }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0px rgba(234, 88, 12, 0.7); }
+            100% { box-shadow: 0 0 0 6px rgba(234, 88, 12, 0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-24">
+
+    <!-- HEADER Y BUSCADOR (FIJO EN LA PARTE SUPERIOR) -->
+    <header class="sticky top-0 z-30 bg-white shadow-md border-b border-slate-200 px-4 py-3">
+        <div class="max-w-4xl mx-auto flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="bg-brand-600 text-white p-2 rounded-xl flex items-center justify-center shadow-sm">
+                        <i class="fa-solid me-1 fa-boxes-stacked text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-900 text-lg leading-tight">Picking de Islas</h1>
+                        <p class="text-xs text-slate-500" id="syncStatus"><i class="fa-solid fa-circle text-emerald-500 text-[9px] me-1"></i>Sincronizado local</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="syncModalBtn" onclick="openSyncModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-cloud text-brand-600"></i>
+                        <span>Compartir</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Campo de búsqueda rápida -->
+            <div class="relative mt-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input type="text" id="searchInput" oninput="handleSearch()" placeholder="Buscar producto en las islas..." 
+                    class="w-full pl-10 pr-10 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white text-sm font-medium transition">
+                <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAPA EN "U" DE ISLAS -->
+    <main class="max-w-4xl mx-auto px-3 pt-4 space-y-6">
+
+        <!-- ALERTA DE RESULTADOS DE BÚSQUEDA -->
+        <div id="searchResultsAlert" class="hidden bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-xl text-xs font-medium flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-lightbulb text-amber-500 text-sm"></i>
+                <span id="searchResultsCount">0 productos encontrados</span>
+            </div>
+            <button onclick="clearSearch()" class="text-amber-700 underline font-semibold">Ver todo</button>
+        </div>
+
+        <!-- SECCIÓN 1: PASILLO DEL FONDO (TRANSVERSAL) -->
+        <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                <div class="flex items-center gap-2">
+                    <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-md">
+                        <i class="fa-solid fa-arrow-right-left me-1"></i>FONDO
+                    </span>
+                    <h2 class="font-bold text-slate-800 text-sm">Pasillo Transversal (Unión)</h2>
+                </div>
+                <button onclick="addIsland('fondo')" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                    <i class="fa-solid fa-plus"></i> Isla
+                </button>
+            </div>
+            <div id="sector-fondo" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <!-- Las islas se cargarán dinámicamente aquí -->
+            </div>
+        </section>
+
+        <!-- CONTENEDOR EN PARALELO PARA PASILLO IZQUIERDO Y DERECHO EN PANTALLAS GRANDES -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- SECCIÓN 2: PASILLO IZQUIERDO -->
+            <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-md">
+                            <i class="fa-solid fa-arrow-up me-1"></i>IZQUIERDA
+                        </span>
+                        <h2 class="font-bold text-slate-800 text-sm">Pasillo Izquierdo</h2>
+                    </div>
+                    <button onclick="addIsland('izquierdo')" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> Isla
+                    </button>
+                </div>
+                <div id="sector-izquierdo" class="space-y-3">
+                    <!-- Las islas se cargarán dinámicamente aquí -->
+                </div>
+            </section>
+
+            <!-- SECCIÓN 3: PASILLO DERECHO -->
+            <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-md">
+                            <i class="fa-solid fa-arrow-up me-1"></i>DERECHA
+                        </span>
+                        <h2 class="font-bold text-slate-800 text-sm">Pasillo Derecho</h2>
+                    </div>
+                    <button onclick="addIsland('derecho')" class="bg-amber-50 text-amber-600 hover:bg-amber-100 px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> Isla
+                    </button>
+                </div>
+                <div id="sector-derecho" class="space-y-3">
+                    <!-- Las islas se cargarán dinámicamente aquí -->
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <!-- MODAL DE EDICIÓN RÁPIDA DE ISLA -->
+    <div id="editModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b pb-2">
+                <h3 class="font-bold text-slate-900 flex items-center gap-2" id="editModalTitle">
+                    <i class="fa-solid fa-pen-to-square text-brand-600"></i> Editar Isla
+                </h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre / Número de Isla:</label>
+                    <input type="text" id="editIslandName" class="w-full px-3 py-2 border rounded-xl bg-slate-50 text-slate-800 font-medium text-sm focus:outline-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-emerald-700 mb-1 flex items-center gap-1">
+                        <i class="fa-solid fa-eye text-emerald-500"></i> Producto FRENTE:
+                    </label>
+                    <input type="text" id="editFrente" placeholder="Ej: Galletitas Oreo 117g" class="w-full px-3 py-2 border border-emerald-200 rounded-xl bg-emerald-50/30 text-slate-800 font-medium text-sm focus:outline-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-amber-700 mb-1 flex items-center gap-1">
+                        <i class="fa-solid fa-eye-slash text-amber-500"></i> Producto DORSO (Atrás):
+                    </label>
+                    <input type="text" id="editDorso" placeholder="Ej: Aceite Marolio 900ml" class="w-full px-3 py-2 border border-amber-200 rounded-xl bg-amber-50/30 text-slate-800 font-medium text-sm focus:outline-amber-500">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-2">
+                <button onclick="saveEditModal()" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm">
+                    Guardar Cambios
+                </button>
+                <button onclick="closeEditModal()" class="bg-slate-100 text-slate-600 font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-slate-200 transition">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE SINCRONIZACIÓN Y NUBE -->
+    <div id="syncModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b pb-2">
+                <h3 class="font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-brand-600"></i> Compartir con el Equipo
+                </h3>
+                <button onclick="closeSyncModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-600 leading-relaxed">
+                Para coordinar con tus 4 compañeros, podés sincronizar en tiempo real a través de una <b>Clave de Sala</b> compartida.
+            </p>
+
+            <div class="bg-slate-50 p-3 rounded-xl border space-y-2">
+                <label class="block text-xs font-bold text-slate-700">Código de Sala Compartida:</label>
+                <div class="flex gap-2">
+                    <input type="text" id="roomKeyInput" placeholder="Ej: hiper-sucursal-12" class="w-full px-3 py-2 border rounded-lg text-sm font-mono font-semibold uppercase text-brand-700 bg-white">
+                    <button onclick="connectRoom()" class="bg-brand-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-brand-700 transition flex items-center gap-1">
+                        <i class="fa-solid fa-plug"></i> Conectar
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-500">Ingresen el mismo código todos tus compañeros para ver los mismos datos.</p>
+            </div>
+
+            <div class="pt-2 border-t flex flex-col gap-2">
+                <span class="text-xs font-bold text-slate-700">Respaldo Manual:</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="exportData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border">
+                        <i class="fa-solid fa-download"></i> Copiar Código
+                    </button>
+                    <button onclick="importDataPrompt()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border">
+                        <i class="fa-solid fa-upload"></i> Pegar Código
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button onclick="closeSyncModal()" class="w-full bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl text-xs">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE LÓGICA DE LA APLICACIÓN Y FIREBASE SINCRONIZACIÓN -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // CONFIGURACIÓN DE DATOS INICIALES POR DEFECTO
+        const defaultIslands = {
+            fondo: [
+                { id: 'f1', name: 'Isla Fondo 1', frente: 'Galletitas Pepitos 119g', dorso: 'Arroz Lucchetti 1kg' },
+                { id: 'f2', name: 'Isla Fondo 2', frente: 'Aceite Natura 1.5L', dorso: 'Fideos Matarazzo 500g' },
+            ],
+            izquierdo: [
+                { id: 'i1', name: 'Isla Izq 1', frente: 'Atún La Campagnola', dorso: 'Mayonesa Hellmanns 475g' },
+                { id: 'i2', name: 'Isla Izq 2', frente: 'Puré de Tomate Noel', dorso: 'Arvejas Noel 300g' },
+                { id: 'i3', name: 'Isla Izq 3', frente: 'Leche La Serenísima 1L', dorso: 'Yogurt Serenito' }
+            ],
+            derecho: [
+                { id: 'd1', name: 'Isla Der 1', frente: 'Jabón en Polvo Ala 800g', dorso: 'Suavizante Vivere 900ml' },
+                { id: 'd2', name: 'Isla Der 2', frente: 'Papel Higiénico Elite 4u', dorso: 'Rollos de Cocina Sussex' },
+                { id: 'd3', name: 'Isla Der 3', frente: 'Lavandina Ayudín 1L', dorso: 'Limpiavidrios Cif' }
+            ]
+        };
+
+        let currentIslands = loadLocalIslands();
+        let currentEditSector = null;
+        let currentEditId = null;
+
+        // VARIABLES DE FIREBASE
+        let db = null;
+        let auth = null;
+        let currentRoomDocRef = null;
+        let unsubscribeRoom = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'hiper-picking-app';
+
+        // Inicializar Firebase si la configuración está presente
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            try {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                signInAnonymously(auth).then(() => {
+                    console.log("Autenticado en Firebase");
+                    // Cargar última sala si existe
+                    const savedRoom = localStorage.getItem('picking_room_id');
+                    if (savedRoom) {
+                        document.getElementById('roomKeyInput').value = savedRoom;
+                        connectRoom(savedRoom);
+                    }
+                }).catch(err => console.error("Error Auth Firebase:", err));
+            } catch (e) {
+                console.warn("Firebase no inicializado:", e);
+            }
+        }
+
+        // CARGAR Y GUARDAR LOCALSTORAGE
+        function loadLocalIslands() {
+            const saved = localStorage.getItem('islas_data');
+            return saved ? JSON.parse(saved) : defaultIslands;
+        }
+
+        function saveIslands(data, isFromSync = false) {
+            currentIslands = data;
+            localStorage.setItem('islas_data', JSON.stringify(data));
+            renderAllIslands();
+
+            // Si hay conexión con sala en Firestore, sincronizar
+            if (!isFromSync && currentRoomDocRef) {
+                setDoc(currentRoomDocRef, { islands: currentIslands, updatedAt: new Date().toISOString() })
+                    .catch(err => console.error("Error al guardar en Firestore:", err));
+            }
+        }
+
+        // RENDERIZADO DE LAS ISLAS
+        function renderAllIslands() {
+            renderSector('fondo', currentIslands.fondo || []);
+            renderSector('izquierdo', currentIslands.izquierdo || []);
+            renderSector('derecho', currentIslands.derecho || []);
+            handleSearch(); // Aplicar búsqueda actual si hay texto
+        }
+
+        function renderSector(sectorKey, islands) {
+            const container = document.getElementById(`sector-${sectorKey}`);
+            if (!container) return;
+
+            if (islands.length === 0) {
+                container.innerHTML = `<div class="text-center py-4 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-medium">Sin islas agregadas</div>`;
+                return;
+            }
+
+            container.innerHTML = islands.map(island => {
+                return `
+                    <div id="card-${island.id}" class="island-card bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-sm transition hover:shadow-md relative group">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-2 mb-2">
+                            <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                <i class="fa-solid fa-cubes text-brand-600"></i> ${escapeHTML(island.name)}
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="window.openEditModal('${sectorKey}', '${island.id}')" class="p-1 text-slate-500 hover:text-brand-600 hover:bg-slate-200 rounded transition text-xs" title="Editar">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="window.deleteIsland('${sectorKey}', '${island.id}')" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition text-xs" title="Eliminar">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CARAS DE LA ISLA (FRENTE Y DORSO) -->
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <!-- FRENTE -->
+                            <div class="frente-box bg-white p-2 rounded-lg border border-emerald-100 space-y-0.5">
+                                <span class="text-[10px] font-bold text-emerald-700 tracking-wider uppercase block">
+                                    <i class="fa-solid fa-eye me-1"></i>Frente
+                                </span>
+                                <p class="frente-text font-semibold text-slate-800 break-words leading-snug">
+                                    ${escapeHTML(island.frente || 'Vacío')}
+                                </p>
+                            </div>
+
+                            <!-- DORSO -->
+                            <div class="dorso-box bg-white p-2 rounded-lg border border-amber-100 space-y-0.5">
+                                <span class="text-[10px] font-bold text-amber-700 tracking-wider uppercase block">
+                                    <i class="fa-solid fa-eye-slash me-1"></i>Atrás
+                                </span>
+                                <p class="dorso-text font-semibold text-slate-800 break-words leading-snug">
+                                    ${escapeHTML(island.dorso || 'Vacío')}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHTML(str) {
+            return String(str).replace(/[&<>"']/g, match => {
+                const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+                return escapeMap[match];
+            });
+        }
+
+        // AGREGAR / ELIMINAR / EDITAR ISLAS
+        window.addIsland = function(sector) {
+            const sectorNames = { fondo: 'Fondo', izquierdo: 'Izq', derecho: 'Der' };
+            const count = (currentIslands[sector] || []).length + 1;
+            const newIsland = {
+                id: 'isl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                name: `Isla ${sectorNames[sector]} ${count}`,
+                frente: '',
+                dorso: ''
+            };
+
+            if (!currentIslands[sector]) currentIslands[sector] = [];
+            currentIslands[sector].push(newIsland);
+            saveIslands(currentIslands);
+
+            // Abrir directamente para editar el contenido
+            window.openEditModal(sector, newIsland.id);
+        };
+
+        window.deleteIsland = function(sector, id) {
+            if (confirm("¿Estás seguro de eliminar esta isla?")) {
+                currentIslands[sector] = currentIslands[sector].filter(i => i.id !== id);
+                saveIslands(currentIslands);
+            }
+        };
+
+        // MODAL EDICIÓN
+        window.openEditModal = function(sector, id) {
+            const island = currentIslands[sector].find(i => i.id === id);
+            if (!island) return;
+
+            currentEditSector = sector;
+            currentEditId = id;
+
+            document.getElementById('editIslandName').value = island.name;
+            document.getElementById('editFrente').value = island.frente;
+            document.getElementById('editDorso').value = island.dorso;
+
+            document.getElementById('editModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('editFrente').focus(), 100);
+        };
+
+        window.closeEditModal = function() {
+            document.getElementById('editModal').classList.add('hidden');
+            currentEditSector = null;
+            currentEditId = null;
+        };
+
+        window.saveEditModal = function() {
+            if (!currentEditSector || !currentEditId) return;
+
+            const name = document.getElementById('editIslandName').value.trim();
+            const frente = document.getElementById('editFrente').value.trim();
+            const dorso = document.getElementById('editDorso').value.trim();
+
+            const island = currentIslands[currentEditSector].find(i => i.id === currentEditId);
+            if (island) {
+                island.name = name || 'Isla Sin Nombre';
+                island.frente = frente;
+                island.dorso = dorso;
+                saveIslands(currentIslands);
+            }
+
+            window.closeEditModal();
+        };
+
+        // BÚSQUEDA Y RESALTADO EN TIEMPO REAL
+        window.handleSearch = function() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const clearBtn = document.getElementById('clearSearchBtn');
+            const alertBox = document.getElementById('searchResultsAlert');
+            const alertCount = document.getElementById('searchResultsCount');
+
+            if (query.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+                alertBox.classList.add('hidden');
+            }
+
+            let matchesCount = 0;
+
+            // Recorrer todas las tarjetas de isla
+            document.querySelectorAll('.island-card').forEach(card => {
+                const frenteBox = card.querySelector('.frente-box');
+                const dorsoBox = card.querySelector('.dorso-box');
+                const frenteText = card.querySelector('.frente-text').textContent.toLowerCase();
+                const dorsoText = card.querySelector('.dorso-text').textContent.toLowerCase();
+
+                // Resetear estilos previos
+                card.classList.remove('highlight-card', 'ring-2', 'ring-amber-500', 'bg-amber-50/50');
+                frenteBox.classList.remove('bg-emerald-200', 'ring-2', 'ring-emerald-500');
+                dorsoBox.classList.remove('bg-amber-200', 'ring-2', 'ring-amber-500');
+
+                if (query.length === 0) {
+                    card.style.display = 'block';
+                    return;
+                }
+
+                const matchesFrente = frenteText.includes(query);
+                const matchesDorso = dorsoText.includes(query);
+
+                if (matchesFrente || matchesDorso) {
+                    matchesCount++;
+                    card.style.display = 'block';
+                    card.classList.add('highlight-card', 'ring-2', 'ring-amber-500');
+
+                    if (matchesFrente) {
+                        frenteBox.classList.add('bg-emerald-200', 'ring-2', 'ring-emerald-500');
+                    }
+                    if (matchesDorso) {
+                        dorsoBox.classList.add('bg-amber-200', 'ring-2', 'ring-amber-500');
+                    }
+                } else {
+                    card.style.display = 'none'; // Ocultar las que no coinciden en la búsqueda activa
+                }
+            });
+
+            if (query.length > 0) {
+                alertBox.classList.remove('hidden');
+                alertCount.textContent = `${matchesCount} isla(s) con "${query}"`;
+            }
+        };
+
+        window.clearSearch = function() {
+            document.getElementById('searchInput').value = '';
+            window.handleSearch();
+        };
+
+        // CONEXIÓN DE SALA FIREBASE PARA COMPAÑEROS
+        window.openSyncModal = function() {
+            document.getElementById('syncModal').classList.remove('hidden');
+        };
+
+        window.closeSyncModal = function() {
+            document.getElementById('syncModal').classList.add('hidden');
+        };
+
+        window.connectRoom = function(customKey) {
+            const keyInput = customKey || document.getElementById('roomKeyInput').value.trim().toLowerCase();
+            if (!keyInput) {
+                alert("Ingresá una clave de sala (ejemplo: hiper-equipo-1)");
+                return;
+            }
+
+            if (!db) {
+                alert("El sistema en tiempo real solo está activo online.");
+                return;
+            }
+
+            if (unsubscribeRoom) unsubscribeRoom();
+
+            localStorage.setItem('picking_room_id', keyInput);
+            // Usar la ruta requerida por la regla de la plataforma
+            currentRoomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', keyInput);
+
+            document.getElementById('syncStatus').innerHTML = `<i class="fa-solid fa-spinner fa-spin text-amber-500 me-1"></i> Conectando...`;
+
+            unsubscribeRoom = onSnapshot(currentRoomDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && data.islands) {
+                        saveIslands(data.islands, true);
+                    }
+                } else {
+                    // Crear la sala con los datos actuales
+                    setDoc(currentRoomDocRef, { islands: currentIslands, createdAt: new Date().toISOString() });
+                }
+                document.getElementById('syncStatus').innerHTML = `<i class="fa-solid fa-cloud text-brand-600 me-1"></i> Sala: <b>${escapeHTML(keyInput.toUpperCase())}</b>`;
+                window.closeSyncModal();
+            }, (err) => {
+                console.error("Error snapshot:", err);
+                document.getElementById('syncStatus').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-500 me-1"></i> Error de conexión`;
+            });
+        };
+
+        // COPIAR / PEGAR DATOS MANUALES
+        window.exportData = function() {
+            const dataStr = JSON.stringify(currentIslands);
+            navigator.clipboard ? navigator.clipboard.writeText(dataStr) : document.execCommand('copy');
+            alert("¡Datos copiados al portapapeles! Podés enviárselos por WhatsApp a un compañero.");
+        };
+
+        window.importDataPrompt = function() {
+            const input = prompt("Pegá aquí el código/texto de respaldo recibido:");
+            if (input) {
+                try {
+                    const parsed = JSON.parse(input);
+                    if (parsed.fondo && parsed.izquierdo && parsed.derecho) {
+                        saveIslands(parsed);
+                        alert("¡Islas actualizadas con éxito!");
+                        window.closeSyncModal();
+                    } else {
+                        alert("El formato del texto no es válido.");
+                    }
+                } catch(e) {
+                    alert("Error al leer los datos pegados.");
+                }
+            }
+        };
+
+        // INICIALIZACIÓN AL CÁRGAR
+        renderAllIslands();
+    </script>
+</body>
+</html>
